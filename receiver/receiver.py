@@ -1,11 +1,16 @@
-from keyExchange import KeyExchange
-from HMAC import HMAC
-from streamCipher import StreamCipher
-from seedEncryption import SeedEncryptor
+from modules.keyExchange import KeyExchange
+from modules.HMAC import HMAC
+from modules.streamCipher import StreamCipher
+from modules.seedEncryption import SeedEncryptor
+
 from cryptography.hazmat.primitives import serialization
 import socket
 import json
 
+import os
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ciphertext_path = os.path.join(project_root, "ciphertext.txt")
 
 def receiver_process():
     key_exchange = KeyExchange()
@@ -88,14 +93,10 @@ def receiver_process():
                     print(f"Received chunk, decrypted {len(decrypted_chunk)} bytes")
 
                 # 11. Save to file
-                with open("decrypted.txt", "wb") as f:
+                with open(ciphertext_path, "wb") as f:
                     f.write(decrypted_text)
                 print("Decryption complete. Saved to decrypted.txt")
 
         except Exception as e:
             print(f"Error during communication: {e}")
             raise
-
-
-if __name__ == "__main__":
-    receiver_process()
