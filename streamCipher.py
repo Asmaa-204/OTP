@@ -1,4 +1,4 @@
-import LCG
+from LCG import LCG
 
 class StreamCipher:
     def __init__(self, seed):

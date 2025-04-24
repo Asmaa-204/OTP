@@ -1,69 +1,101 @@
 from keyExchange import KeyExchange
-from comm import Communicator
 from HMAC import HMAC
 from streamCipher import StreamCipher
 from seedEncryption import SeedEncryptor
 from cryptography.hazmat.primitives import serialization
+import socket
+import json
 
-import os
 
 def receiver_process():
-    # 1. Perform key exchange (Diffie-Hellman)
     key_exchange = KeyExchange()
     private_key, public_key = key_exchange.generate_key_pair()
-    print(f"receiver public key = {public_key}\n")
+    public_numbers = public_key.public_numbers()
+    print("Receiver Public Key Components:")
+    print(f"Prime modulus (p): {hex(public_numbers.parameter_numbers.p)}")
+    print(f"Generator (g): {hex(public_numbers.parameter_numbers.g)}")
+    print(f"Public value (y): {hex(public_numbers.y)}\n")
 
-    # 2. Wait for sender's public key
-    communicator = Communicator("localhost", 12346)
-    communicator.listen()
-    
-    sender_public_key = serialization.load_pem_public_key(
-        communicator.receive()["public_key"].encode()
-    )
-    print(f"sender public key = {sender_public_key}\n")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("localhost", 12346))
+        s.listen()
+        print("Waiting for connection...")
+        conn, addr = s.accept()
+        print(f"Connected by {addr}")
 
-    # 3. Send our public key to sender
-    communicator.send(
-        {
-            "public_key": public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            ).decode()
-        }
-    )
+        try:
+            with conn:
+                conn_file = conn.makefile()
 
-    # 4. Derive shared secret
-    shared_key = key_exchange.derive_shared_key(private_key, sender_public_key)
-    print(f"shared key: {shared_key}\n")
+                # 3. Receive sender's public key
+                sender_data = json.loads(conn_file.readline())
+                sender_public_key = serialization.load_pem_public_key(
+                    sender_data["public_key"].encode()
+                )
+                print(f"Sender public key = {sender_public_key}")
 
-    # 5. Receive encrypted seed and HMAC
-    seed_data = communicator.receive()
-    encrypted_seed = bytes.fromhex(seed_data["encrypted_seed"])
-    received_hmac = bytes.fromhex(seed_data["hmac"])
+                # 4. Send our public key
+                conn.sendall(
+                    (
+                        json.dumps(
+                            {
+                                "public_key": public_key.public_bytes(
+                                    encoding=serialization.Encoding.PEM,
+                                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                                ).decode()
+                            }
+                        )
+                        + "\n"
+                    ).encode()
+                )
 
-    # 6. Verify HMAC
-    authenticator = HMAC(shared_key[32:])
-    if not authenticator.verify_hmac(encrypted_seed, received_hmac):
-        raise ValueError("HMAC verification failed!")
+                # 5. Derive shared secret
+                shared_key = key_exchange.get_secret_key(private_key, sender_public_key)
+                print(f"Shared key: {shared_key}\n")
 
-    # 7. Decrypt seed
-    seed_encryptor = SeedEncryptor(shared_key[:32])
-    seed = seed_encryptor.decrypt(encrypted_seed)
+                # 6. Receive encrypted seed and HMAC
+                seed_data = json.loads(conn_file.readline())
+                encrypted_seed = bytes.fromhex(seed_data["encrypted_seed"])
+                received_hmac = bytes.fromhex(seed_data["hmac"])
 
-    # 8. Initialize stream cipher
-    cipher = StreamCipher(seed)
+                # 7. Verify HMAC
+                authenticator = HMAC(shared_key[32:])
+                if not authenticator.verify_hmac(encrypted_seed, received_hmac):
+                    raise ValueError("HMAC verification failed!")
 
-    # 9. Receive and decrypt ciphertext chunks
-    decrypted_text = bytearray()
-    while True:
-        print(f"decrypting message....\n")
-        chunk_data = communicator.receive()
-        if "ciphertext_chunk" not in chunk_data:
-            break
-        ciphertext_chunk = bytes.fromhex(chunk_data["ciphertext_chunk"])
-        decrypted_chunk = cipher.decrypt(ciphertext_chunk)
-        decrypted_text.extend(decrypted_chunk)
+                # 8. Decrypt seed
+                seed_encryptor = SeedEncryptor(shared_key[:32])
+                seed = seed_encryptor.decrypt(encrypted_seed)
 
-    # 10. Write decrypted text to file
-    with open("decrypted.txt", "wb") as f:
-        f.write(decrypted_text)
+                # 9. Initialize stream cipher
+                cipher = StreamCipher(seed)
+
+                # 10. Receive and decrypt ciphertext chunks
+                decrypted_text = bytearray()
+                while True:
+                    line = conn_file.readline()
+                    if not line:
+                        break
+
+                    chunk_data = json.loads(line)
+                    if "status" in chunk_data and chunk_data["status"] == "EOT":
+                        break
+
+                    ciphertext_chunk = bytes.fromhex(chunk_data["ciphertext_chunk"])
+                    decrypted_chunk = cipher.decrypt(ciphertext_chunk)
+                    decrypted_text.extend(decrypted_chunk)
+                    print(f"Received chunk, decrypted {len(decrypted_chunk)} bytes")
+
+                # 11. Save to file
+                with open("decrypted.txt", "wb") as f:
+                    f.write(decrypted_text)
+                print("Decryption complete. Saved to decrypted.txt")
+
+        except Exception as e:
+            print(f"Error during communication: {e}")
+            raise
+
+
+if __name__ == "__main__":
+    receiver_process()
