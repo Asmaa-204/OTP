@@ -2,10 +2,7 @@ from modules.keyExchange import KeyExchange
 from modules.HMAC import HMAC
 from modules.streamCipher import StreamCipher
 from modules.seedEncryption import SeedEncryptor
-
-from cryptography.hazmat.primitives import serialization
-import socket
-import json
+from modules.socketSender import SocketSender
 import os
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,33 +26,13 @@ def sender_process():
     print(f"Generator (g): {hex(public_numbers.parameter_numbers.g)}")
     print(f"Public value (y): {hex(public_numbers.y)}\n")
 
-    # 4. Connect to receiver
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect(("localhost", 12346))
-        print("Connected to receiver")
-
-        try:
+    try:
+        with SocketSender() as secure_socket:
             # 5. Send our public key
-            s.sendall(
-                (
-                    json.dumps(
-                        {
-                            "public_key": public_key.public_bytes(
-                                encoding=serialization.Encoding.PEM,
-                                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                            ).decode()
-                        }
-                    )
-                    + "\n"
-                ).encode()
-            )
+            secure_socket.send_public_key(public_key)
 
             # 6. Receive receiver's public key
-            conn_file = s.makefile()
-            data = json.loads(conn_file.readline())
-            receiver_public_key = serialization.load_pem_public_key(
-                data["public_key"].encode()
-            )
+            receiver_public_key = secure_socket.receive_public_key()
             print(f"Receiver public key = {receiver_public_key}")
 
             # 7. Derive shared secret
@@ -71,17 +48,7 @@ def sender_process():
             hmac_value = authenticator.generate_hmac(encrypted_seed)
 
             # 10. Send encrypted seed and HMAC
-            s.sendall(
-                (
-                    json.dumps(
-                        {
-                            "encrypted_seed": encrypted_seed.hex(),
-                            "hmac": hmac_value.hex(),
-                        }
-                    )
-                    + "\n"
-                ).encode()
-            )
+            secure_socket.send_seed_data(encrypted_seed, hmac_value)
 
             # 11. Encrypt plaintext
             cipher = StreamCipher(seed)
@@ -92,17 +59,15 @@ def sender_process():
             chunk_size = 10
             for i in range(0, len(ciphertext), chunk_size):
                 chunk = ciphertext[i : i + chunk_size]
-                s.sendall(
-                    (json.dumps({"ciphertext_chunk": chunk.hex()}) + "\n").encode()
-                )
+                secure_socket.send_ciphertext_chunk(chunk)
                 print(
                     f"Sent chunk {i//chunk_size + 1}/{(len(ciphertext)-1)//chunk_size + 1}"
                 )
 
             # 13. Send end-of-transmission marker
-            s.sendall((json.dumps({"status": "EOT"}) + "\n").encode())
+            secure_socket.send_eot()
             print("All chunks sent")
 
-        except Exception as e:
-            print(f"Error during communication: {e}")
-            raise
+    except Exception as e:
+        print(f"Error during communication: {e}")
+        raise
