@@ -7,10 +7,12 @@ import os
 class SeedEncryptor:
     def __init__(self, key):
         self.key = key
+        print(f"INSIDE SEED ENCRYPTOR (key): {key} of length {len(key)} bytes\n")
 
     def encrypt(self, seed):
         """Encrypt seed using AES in CBC mode"""
         iv = os.urandom(16)
+        print(f"INSIDE SEED ENCRYPTOR (seed): {seed}\n")
         cipher = Cipher(
             algorithms.AES(self.key), modes.CBC(iv), backend=default_backend()
         )

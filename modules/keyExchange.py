@@ -1,20 +1,13 @@
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from config.constants import DH_PRIME, DH_GENERATOR, KDF_LENGTH, KDF_SALT, KDF_INFO
 
 
 class KeyExchange:
     def __init__(self):
-        p = int(
-            "FCA682CE8E12CABA26EFCCF7110E526DB078B05EDEED3AD6"
-            "218DA3CBAA72C0F8E2D0D29010C191F2579847DE51F6B6F7"
-            "C6C7E15D69820B5C82E116E3D3B6F5D30A74E83F7DDF6E56"
-            "2E0C2A973DF7C6B403642A9495C917DF090EB8228D64AB96"
-            "EA8F1A0F4A68E3C7B7A0C7C3F83BA3E725A92F9F5DC52C52"
-            "A9B06D96EA0D03C17A8EAF0AA32D23D8B",
-            16,
-        )
-        g = 2
+        p = int(DH_PRIME, 16)
+        g = DH_GENERATOR
 
         params_numbers = dh.DHParameterNumbers(p, g)
         self.params = params_numbers.parameters()
@@ -31,8 +24,13 @@ class KeyExchange:
         """
         return shared secret key
         """
+        public_numbers = peer_public_key.public_numbers()
+        print(f"INSIDE KEY EXCHANGE (peer public key): {hex(public_numbers.y)}\n")
         shared_key = private_key.exchange(peer_public_key)
         derived_key = HKDF(
-            algorithm=hashes.SHA256(), length=32, salt=None, info=b"secure-session"
+            algorithm=hashes.SHA256(), length=KDF_LENGTH, salt=KDF_SALT, info=KDF_INFO
         ).derive(shared_key)
+
+        print(f"Shared key length: {len(shared_key)} bytes\n")
+        print(f"Shared key: {shared_key}\n")
         return derived_key

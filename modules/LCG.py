@@ -1,5 +1,7 @@
+from config.constants import LCG_A, LCG_C, LCG_M
+
 class LCG:
-    def __init__(self, seed, a = 16807, c = 1013904223, m = 2**31 - 1):
+    def __init__(self, seed, a = LCG_A, c = LCG_C, m = LCG_M):
         self.seed = seed
         self.a = a
         self.c = c

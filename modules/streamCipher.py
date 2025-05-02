@@ -8,6 +8,7 @@ class StreamCipher:
         """
         encrypt the plain text with OTP generated from LCG
         """
+        print(f"INSIDE STREAM CIPHER: {plaintext}\n")
         keystream = self.lcg.generate(len(plaintext))
         ciphertext = bytes([p ^ k for p, k in zip(plaintext, keystream)])
         return ciphertext

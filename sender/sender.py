@@ -16,15 +16,17 @@ def sender_process():
 
     # 2. Generate random seed
     seed = int.from_bytes(os.urandom(16), "big")
+    print(f"Random seed: {seed}\n")
 
     # 3. Perform key exchange (Diffie-Hellman)
     key_exchange = KeyExchange()
     private_key, public_key = key_exchange.generate_key_pair()
     public_numbers = public_key.public_numbers()
+
     print("Sender Public Key Components:")
-    print(f"Prime modulus (p): {hex(public_numbers.parameter_numbers.p)}")
-    print(f"Generator (g): {hex(public_numbers.parameter_numbers.g)}")
-    print(f"Public value (y): {hex(public_numbers.y)}\n")
+    print(f"Prime modulus (p): {hex(public_numbers.parameter_numbers.p)}\n")
+    print(f"Generator (g): {hex(public_numbers.parameter_numbers.g)}\n")
+    print(f"Sender public key: {hex(public_numbers.y)}\n")
 
     try:
         with SocketSender() as secure_socket:
@@ -33,15 +35,16 @@ def sender_process():
 
             # 6. Receive receiver's public key
             receiver_public_key = secure_socket.receive_public_key()
-            print(f"Receiver public key = {receiver_public_key}")
+            receiver_numbers = receiver_public_key.public_numbers()
 
             # 7. Derive shared secret
             shared_key = key_exchange.get_secret_key(private_key, receiver_public_key)
-            print(f"Shared key: {shared_key}\n")
 
             # 8. Encrypt seed
             seed_encryptor = SeedEncryptor(shared_key[:32])
             encrypted_seed = seed_encryptor.encrypt(seed)
+            print(f"Encrypted seed: {encrypted_seed}\n")
+            print(f"Encrypted seed length: {len(encrypted_seed)} bytes\n")
 
             # 9. Generate HMAC
             authenticator = HMAC(shared_key[32:])
@@ -53,7 +56,7 @@ def sender_process():
             # 11. Encrypt plaintext
             cipher = StreamCipher(seed)
             ciphertext = cipher.encrypt(plaintext)
-            print(f"Cipher text length: {len(ciphertext)} bytes\n")
+            print(f"Cipher text: {ciphertext} of length {len(ciphertext)} bytes\n")
 
             # 12. Send ciphertext in chunks of 10 bytes
             chunk_size = 10

@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives import hashes, hmac
 class HMAC:
     def __init__(self, key):
         self.key = key
+        print(f"INSIDE HMAC: {key} of length {len(key)} bytes\n") 
 
     def generate_hmac(self, message):
         """
