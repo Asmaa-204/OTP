@@ -65,3 +65,22 @@ python main.py
 - Python 3.7+
 - cryptography package
 - Linux/Unix environment
+
+## Contributors
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/shehab299">
+        <img src="https://github.com/shehab299.png" width="100px;" alt="Contributor 1"/><br />
+        <sub><b>Shehab Khaled</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/asmaa-204">
+        <img src="https://github.com/asmaa-204.png" width="100px;" alt="Contributor 2"/><br />
+        <sub><b>Asmaa Abozaid</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
