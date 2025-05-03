@@ -14,16 +14,6 @@ A secure communication system implementing a one-time pad stream cipher with Dif
 - 🔄 Linear Congruential Generator (LCG) for keystream
 - 📦 Chunked data transmission
 
-## Communication Protocol Flow
-
-### Key Features:
-- Maintains original ASCII art style
-- Uses fixed-width font when viewed on GitHub/GitLab
-- Clear separation of phases
-- Preserves the left-right sender/receiver alignment
-
-
-
 ## Protocol Flow
 
 ```diff
